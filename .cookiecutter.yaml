@@ -1,0 +1,10 @@
+default_context:
+    author_name: "Eva Maxfield Brown"
+    author_email: "evamaxfieldbrown@gmail.com"
+    hosting_github_username_or_org: "bioio-devs"
+    project_name: "bioio-tifffile"
+    project_slug: "bioio-tifffile"
+    python_slug: "bioio_tifffile"
+    project_short_description: "A BioIO reader plugin for reading TIFFs using Tifffile"
+    hosting_pypi_username: "bioio-devs"
+    license: "MIT License"
