@@ -1,0 +1,7 @@
+bioio_tifffile
+==============
+
+.. toctree::
+   :maxdepth: 4
+
+   bioio_tifffile

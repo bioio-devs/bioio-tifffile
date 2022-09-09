@@ -1,0 +1,45 @@
+bioio\_tifffile package
+=======================
+
+Submodules
+----------
+
+bioio\_tifffile.example module
+------------------------------
+
+.. automodule:: bioio_tifffile.example
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+bioio\_tifffile.reader module
+-----------------------------
+
+.. automodule:: bioio_tifffile.reader
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+bioio\_tifffile.reader\_metadata module
+---------------------------------------
+
+.. automodule:: bioio_tifffile.reader_metadata
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+bioio\_tifffile.utils module
+----------------------------
+
+.. automodule:: bioio_tifffile.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: bioio_tifffile
+   :members:
+   :undoc-members:
+   :show-inheritance:
