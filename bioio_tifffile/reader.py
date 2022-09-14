@@ -7,13 +7,14 @@ import bioio_types
 import dask.array as da
 import numpy as np
 import xarray as xr
-from bioio_types import constants, exceptions, types
+from bioio_types import constants, exceptions
+from bioio_types import io as io_utils
+from bioio_types import types
 from bioio_types.dimensions import (
     DEFAULT_CHUNK_DIMS,
     REQUIRED_CHUNK_DIMS,
     DimensionNames,
 )
-from bioio_types import io as io_utils
 from dask import delayed
 from fsspec.spec import AbstractFileSystem
 from tifffile import TiffFile, TiffFileError, imread
