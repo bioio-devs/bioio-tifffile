@@ -4,14 +4,6 @@ bioio\_tifffile package
 Submodules
 ----------
 
-bioio\_tifffile.example module
-------------------------------
-
-.. automodule:: bioio_tifffile.example
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 bioio\_tifffile.reader module
 -----------------------------
 
