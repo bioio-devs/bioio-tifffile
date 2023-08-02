@@ -23,6 +23,7 @@ clean:
 # install with all deps
 install:
 	pip install -e .[lint,test,docs]
+	pre-commit install
 
 # lint, format, and check all files
 lint:

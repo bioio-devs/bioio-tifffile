@@ -52,7 +52,9 @@ Ready to contribute? Here's how to set up `bioio-tifffile` for local development
     git push origin {your_development_type}/short-description
     ```
 
-7. Submit a pull request through the GitHub website.
+7. (Optionally) If the test files have changed you'll need to find an admin to upload your test file set using the script in scripts/
+
+8. Submit a pull request through the GitHub website.
 
 ## Just Commands
 

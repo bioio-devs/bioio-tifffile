@@ -15,7 +15,7 @@ A BioIO reader plugin for reading TIFFs using Tifffile
 ## Quickstart
 
 ```python
-from bioio_tifffile.reader import Reader
+from bioio_tifffile import Reader 
 
 r = Reader("my-image.tiff")
 r.dims

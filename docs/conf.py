@@ -75,8 +75,8 @@ main_doc = "index"
 
 # General information about the project.
 project = "bioio-tifffile"
-copyright = "2022"
-author = "Eva Maxfield Brown"
+copyright = "2023"
+author = "Sean Meharry"
 
 # The version info for the project you"re documenting, acts as replacement
 # for |version| and |release|, also used in various other places throughout
@@ -156,7 +156,7 @@ latex_documents = [
         main_doc,
         "bioio_tifffile.tex",
         "bioio-tifffile Documentation",
-        "Eva Maxfield Brown",
+        "Sean Meharry",
         "manual",
     ),
 ]
@@ -181,6 +181,6 @@ texinfo_documents = [
         "bioio-tifffile Documentation",
         author,
         "bioio_tifffile",
-        "A BioIO reader plugin for reading TIFFs using Tifffile",
+        "A BioIO reader plugin for reading TIFF files.",
     ),
 ]
