@@ -111,3 +111,17 @@ jobs:
       with:
         user: bioio-devs
         password: ${{ secrets.PYPI_TOKEN }}
+
+  results:
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: [check-manifest, test, lint]
+    runs-on: ubuntu-latest
+    name: Final Result
+    steps:
+      - run: exit 1
+        # see https://stackoverflow.com/a/67532120/4907315
+        if: >-
+          ${{
+                contains(needs.*.result, 'failure')
+            || contains(needs.*.result, 'cancelled')
+          }}
