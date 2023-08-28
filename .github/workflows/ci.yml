@@ -116,7 +116,7 @@ jobs:
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs: [check-manifest, test, lint]
     runs-on: ubuntu-latest
-    name: Final Result
+    name: Report Result
     steps:
       - run: exit 1
         # see https://stackoverflow.com/a/67532120/4907315
