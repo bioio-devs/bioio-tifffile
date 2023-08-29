@@ -111,3 +111,20 @@ jobs:
       with:
         user: bioio-devs
         password: ${{ secrets.PYPI_TOKEN }}
+
+  # Required by bioio-devs organization to succeed in order to merge
+  # done this way due to matrix testing strategy providing difficult
+  # to track workflow test names
+  results:
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: [check-manifest, test, lint]
+    runs-on: ubuntu-latest
+    name: Report Result
+    steps:
+      - run: exit 1
+        # see https://stackoverflow.com/a/67532120/4907315
+        if: >-
+          ${{
+                contains(needs.*.result, 'failure')
+            || contains(needs.*.result, 'cancelled')
+          }}
