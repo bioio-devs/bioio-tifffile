@@ -1,7 +1,7 @@
 # bioio-tifffile
 
-[![Build Status](https://github.com/bioio-devs/bioio-tifffile/workflows/CI/badge.svg)](https://github.com/bioio-devs/bioio-tifffile/actions)
-[![Documentation](https://github.com/bioio-devs/bioio-tifffile/workflows/Documentation/badge.svg)](https://bioio-devs.github.io/bioio-tifffile)
+[![Build Status](https://github.com/bioio-devs/bioio-tifffile/actions/workflows/ci.yml/badge.svg)](https://github.com/bioio-devs/bioio-tifffile/actions)
+[![Documentation](https://github.com/bioio-devs/bioio-tifffile/actions/workflows/docs.yml/badge.svg)](https://bioio-devs.github.io/bioio-tifffile)
 
 A BioIO reader plugin for reading TIFFs using Tifffile
 
