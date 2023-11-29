@@ -42,6 +42,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - uses: aws-actions/configure-aws-credentials@v3
+      env:
+        BUCKET_NAME : "bioio-dev-test-resources"
+        AWS_REGION : "us-west-2"
+      permissions:
+        id-token: write   # This is required for requesting the JWT
+        contents: read    # This is required for actions/checkout
+      with:
+        role-to-assume: arn:aws:iam::978220035532:role/bioio_github
+        role-session-name: bioio-tifffile-${{ github.sha }}
+        aws-region: ${{ env.AWS_REGION }}
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
