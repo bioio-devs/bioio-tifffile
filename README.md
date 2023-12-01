@@ -26,32 +26,18 @@ Install bioio-tifffile alongside bioio:
 
 `pip install bioio bioio-tifffile`
 
+
+This example shows a simple use case for just accessing the pixel data of the image
+by explicitly passing this `Reader` into the `BioImage`. Passing the `Reader` into
+the `BioImage` instance is optional as `bioio` will automatically detect installed
+plug-ins and auto-select the most recently installed plug-in that supports the file
+passed in.
 ```python
 from bioio import BioImage
+import bioio_tifffile
 
-# Get a BioImage object
-img = BioImage("my_file.tiff")  # selects the first scene found
-img.data  # returns 5D TCZYX numpy array
-img.xarray_data  # returns 5D TCZYX xarray data array backed by numpy
-img.dims  # returns a Dimensions object
-img.dims.order  # returns string "TCZYX"
-img.dims.X  # returns size of X dimension
-img.shape  # returns tuple of dimension sizes in TCZYX order
-img.get_image_data("CZYX", T=0)  # returns 4D CZYX numpy array
-
-# Get the id of the current operating scene
-img.current_scene
-
-# Get a list valid scene ids
-img.scenes
-
-# Change scene using name
-img.set_scene("Image:1")
-# Or by scene index
-img.set_scene(1)
-
-# Use the same operations on a different scene
-# ...
+img = BioImage("my_file.tiff", reader=bioio_tifffile.Reader)
+img.data
 ```
 
 ## Issues
