@@ -71,11 +71,6 @@ instance/
 # Scrapy stuff:
 .scrapy
 
-# Sphinx documentation
-docs/_build/
-docs/bioio_tifffile.*rst
-docs/modules.rst
-
 # PyBuilder
 target/
 
