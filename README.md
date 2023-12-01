@@ -1,7 +1,6 @@
 # bioio-tifffile
 
 [![Build Status](https://github.com/bioio-devs/bioio-tifffile/actions/workflows/ci.yml/badge.svg)](https://github.com/bioio-devs/bioio-tifffile/actions)
-[![Documentation](https://github.com/bioio-devs/bioio-tifffile/actions/workflows/docs.yml/badge.svg)](https://bioio-devs.github.io/bioio-tifffile)
 [![PyPI version](https://badge.fury.io/py/bioio-tifffile.svg)](https://badge.fury.io/py/bioio-tifffile)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9,3.10,3.11-blue.svg)](https://www.python.org/downloads/release/python-390/)
@@ -14,6 +13,8 @@ A BioIO reader plugin for reading TIFFs using `tifffile`
 ## Documentation
 
 [See the full documentation on our GitHub pages site](https://bioio-devs.github.io/bioio/OVERVIEW.html) - the generic use and installation instructions there will work for this package.
+
+Information about the base reader this package relies on can be found in the `bioio-base` repository [here](https://github.com/bioio-devs/bioio-base)
 
 ## Installation
 
