@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import logging
 import typing
 import warnings
 
@@ -21,6 +22,8 @@ from .utils import generate_ome_channel_id, generate_ome_image_id
 # "I" is used to mean a generic image sequence
 UNKNOWN_DIM_CHARS = ["Q", "I"]
 TIFF_IMAGE_DESCRIPTION_TAG_INDEX = 270
+
+log = logging.getLogger(__name__)
 
 ###############################################################################
 
@@ -81,6 +84,13 @@ class Reader(reader.Reader):
         fs_kwargs: typing.Dict[str, typing.Any] = {},
         **kwargs: typing.Any,
     ):
+        if str(image).endswith(".ome.tiff"):
+            log.warning(
+                "The image ends with .ome.tiff, which might indicate an OME-TIFF "
+                "file format. You might want to install the "
+                "`bioio-ome-tiff` plug-in for improved metadata Processing."
+            )
+
         # Expand details of provided image
         self._fs, self._path = io.pathlike_to_fs(
             image,
