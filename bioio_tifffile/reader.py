@@ -84,11 +84,14 @@ class Reader(reader.Reader):
         fs_kwargs: typing.Dict[str, typing.Any] = {},
         **kwargs: typing.Any,
     ):
-        if str(image).endswith(".ome.tiff"):
+        if ".ome.tif" in str(image):
             log.warning(
                 "The image ends with .ome.tiff, which might indicate an OME-TIFF "
                 "file format. You might want to install the "
                 "`bioio-ome-tiff` plug-in for improved metadata Processing."
+                "You can also use 'bioio.plugin_feasibility_report(image)' "
+                "method to check if a specific image can be handled by the "
+                "available plugins."
             )
 
         # Expand details of provided image
