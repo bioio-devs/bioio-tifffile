@@ -33,7 +33,7 @@ dependencies = [
   "fsspec>=2022.8.0",
   "imagecodecs>=2020.5.30",
   "numpy>=1.16",
-  "tifffile>=2022.4.22",
+  "tifffile>=2023.7.10",
   "xarray>=0.16.1",
   "zarr>=2.6",
 ]
