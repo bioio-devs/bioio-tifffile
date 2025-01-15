@@ -35,7 +35,7 @@ dependencies = [
   "numpy>=1.16",
   "tifffile>=2023.7.10",
   "xarray>=0.16.1",
-  "zarr>=2.6",
+  "zarr>=2.6,<3.0.0",
 ]
 
 [project.urls]
