@@ -7,11 +7,12 @@ import warnings
 
 import dask.array as da
 import numpy as np
+import tifffile
 import xarray as xr
 from bioio_base import constants, dimensions, exceptions, io, reader, types
 from dask import delayed
 from fsspec.spec import AbstractFileSystem
-from tifffile import TIFF, TiffFile, TiffFileError, imread
+from tifffile import TiffFile, TiffFileError, imread
 from tifffile.tifffile import TiffTags
 
 from .utils import generate_ome_channel_id, generate_ome_image_id
@@ -575,17 +576,17 @@ _NAME_TO_MICRONS = {
     "µm": 1,
     "um": 1,
     "\\u00B5m": 1,  # µm unicode
-    TIFF.RESUNIT.NONE: 1,
-    TIFF.RESUNIT.MICROMETER: 1,
+    tifffile.RESUNIT.NONE: 1,
+    tifffile.RESUNIT.MICROMETER: 1,
     None: 1,
     "mm": 1e3,
     "millimeter": 1e3,
-    TIFF.RESUNIT.MILLIMETER: 1e3,
+    tifffile.RESUNIT.MILLIMETER: 1e3,
     "cm": 1e4,
     "centimeter": 1e4,
-    TIFF.RESUNIT.CENTIMETER: 1e4,
+    tifffile.RESUNIT.CENTIMETER: 1e4,
     "cal": 2.54 * 1e4,
-    TIFF.RESUNIT.INCH: 2.54 * 1e4,
+    tifffile.RESUNIT.INCH: 2.54 * 1e4,
 }
 
 
