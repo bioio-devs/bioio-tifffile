@@ -153,7 +153,9 @@ class Reader(reader.Reader):
     @property
     def physical_pixel_sizes(self) -> types.PhysicalPixelSizes:
         """Return the physical pixel sizes of the image."""
-        if self._physical_pixel_sizes is None:
+        if self._physical_pixel_sizes is None or any(
+            size is None for size in self._physical_pixel_sizes
+        ):
             with self._fs.open(self._path) as open_resource:
                 try:
                     z_size, y_size, x_size = _get_pixel_size(
