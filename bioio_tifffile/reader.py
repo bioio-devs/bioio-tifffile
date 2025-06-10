@@ -12,7 +12,7 @@ import xarray as xr
 from bioio_base import constants, dimensions, exceptions, io, reader, types
 from dask import delayed
 from fsspec.spec import AbstractFileSystem
-from tifffile import TiffFile, TiffFileError, imread
+from tifffile import TiffFile, imread
 from tifffile.tifffile import TiffTags
 
 from .utils import generate_ome_channel_id, generate_ome_image_id
@@ -71,8 +71,12 @@ class Reader(reader.Reader):
                 with TiffFile(open_resource):
                     return True
 
-        except (TiffFileError, TypeError):
-            return False
+        except Exception as e:
+            raise exceptions.UnsupportedFileFormatError(
+                "bioio-tifffile",
+                path,
+                str(e),
+            )
 
     def __init__(
         self,
@@ -133,10 +137,7 @@ class Reader(reader.Reader):
         self._channel_names = channel_names
 
         # Enforce valid image
-        if not self._is_supported_image(self._fs, self._path):
-            raise exceptions.UnsupportedFileFormatError(
-                self.__class__.__name__, self._path
-            )
+        self._is_supported_image(self._fs, self._path)
 
     @property
     def scenes(self) -> typing.Tuple[str, ...]:
