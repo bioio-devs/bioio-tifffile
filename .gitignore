@@ -37,9 +37,6 @@ wheels/
 # Virtual envs
 venv/
 
-# Test resources
-bioio_tifffile/tests/resources/
-
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
