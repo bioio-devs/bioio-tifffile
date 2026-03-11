@@ -28,7 +28,7 @@ def generate_ome_channel_id(image_id: str, channel_id: typing.Union[str, int]) -
     """
     # Remove the prefix 'Image:' to get just the index
     image_index = image_id.replace("Image:", "")
-    return f"Channel:{image_index}:{channel_id}"
+    return f"Channel:{image_index}:{channel_id}"  # noqa: E231
 
 
 def generate_ome_image_id(image_id: typing.Union[str, int]) -> str:
@@ -47,4 +47,4 @@ def generate_ome_image_id(image_id: typing.Union[str, int]) -> str:
     ome_image_id: str
         The OME standard for image IDs.
     """
-    return f"Image:{image_id}"
+    return f"Image:{image_id}"  # noqa: E231
