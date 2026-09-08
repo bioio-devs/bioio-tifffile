@@ -12,7 +12,7 @@ import xarray as xr
 from bioio_base import constants, dimensions, exceptions, io, reader, types
 from dask import delayed
 from fsspec.spec import AbstractFileSystem
-from tifffile import TiffFile, imread
+from tifffile import TiffFile
 from tifffile.tifffile import TiffTags
 
 from .utils import generate_ome_channel_id, generate_ome_image_id
@@ -198,23 +198,20 @@ class Reader(reader.Reader):
             The image chunk as a numpy array.
         """
         with fs.open(path) as open_resource:
-            with imread(
-                open_resource,
-                aszarr=True,
-                series=scene,
-                level=0,
-                chunkmode="page",
-                is_mmstack=False,
-            ) as store:
-                arr = da.from_zarr(store)
-                arr = arr.transpose(transpose_indices)
+            with TiffFile(open_resource, is_mmstack=False) as tiff:
+                with tiff.series[scene].aszarr(
+                    level=0,
+                    chunkmode="page",
+                ) as store:
+                    arr = da.from_zarr(store)
+                    arr = arr.transpose(transpose_indices)
 
-                # By setting the compute call to always use a "synchronous" scheduler,
-                # it informs Dask not to look for an existing scheduler / client
-                # and instead simply read the data using the current thread / process.
-                # In doing so, we shouldn't run into any worker data transfer and
-                # handoff _during_ a read.
-                return arr[retrieve_indices].compute(scheduler="synchronous")
+                    # By setting the compute call to always use a "synchronous"
+                    # scheduler, it informs Dask not to look for an existing
+                    # scheduler / client and instead simply read the data using the
+                    # current thread / process. In doing so, we shouldn't run into
+                    # any worker data transfer and handoff _during_ a read.
+                    return arr[retrieve_indices].compute(scheduler="synchronous")
 
     def _get_tiff_tags(self, tiff: TiffFile, process: bool = True) -> TiffTags:
         unprocessed_tags = tiff.series[self.current_scene_index].pages[0].tags
