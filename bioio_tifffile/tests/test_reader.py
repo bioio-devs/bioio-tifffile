@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pytest
+import tifffile
 from bioio_base import exceptions, test_utilities
 from distributed import Client, LocalCluster
 
@@ -399,3 +400,29 @@ def test_no_scene_prop_access(
     # Construct image and check no scene call with property access
     img = Reader(uri)
     assert img.shape == expected_shape
+
+
+@pytest.mark.parametrize(
+    "written_shape",
+    [
+        (1, 20, 30),
+        (1, 2, 20, 30),
+        (2, 1, 20, 30),
+        (1, 1, 20, 30),
+    ],
+)
+def test_size_one_dim_delayed_read(
+    tmp_path: pathlib.Path,
+    written_shape: Tuple[int, ...],
+) -> None:
+    # Depending on the tifffile version, the series shape may drop the size one
+    # dimensions while the Zarr store used for the delayed read keeps them.
+    # See: https://github.com/bioio-devs/bioio-tifffile/issues/54
+    data = np.random.randint(0, 255, written_shape).astype(np.uint8)
+    uri = tmp_path / "size-one-dims.tiff"
+    tifffile.imwrite(uri, data)
+
+    img = Reader(uri)
+
+    # The delayed read must produce the same data as the in memory read
+    np.testing.assert_array_equal(img.dask_data.compute(), img.data)
