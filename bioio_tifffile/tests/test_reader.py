@@ -178,11 +178,7 @@ def test_tiff_reader_with_non_tiff_file(sample_text_file: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "filename, "
-    "first_scene_id, "
-    "first_scene_shape, "
-    "second_scene_id, "
-    "second_scene_shape",
+    "filename, first_scene_id, first_scene_shape, second_scene_id, second_scene_shape",
     [
         (
             "s_3_t_1_c_3_z_5.ome.tiff",
