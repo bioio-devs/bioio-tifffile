@@ -153,7 +153,7 @@ class Reader(reader.Reader):
 
     @property
     def physical_pixel_sizes(self) -> types.PhysicalPixelSizes:
-        """Return the physical pixel sizes of the image."""
+        """Return the current scene's physical pixel sizes in microns."""
         if self._physical_pixel_sizes is None:
             with self._fs.open(self._path) as open_resource:
                 try:
@@ -588,6 +588,54 @@ _NAME_TO_MICRONS = {
 }
 
 
+def _positive_size_in_microns(
+    value: typing.Any, microns_per_unit: float
+) -> typing.Optional[float]:
+    if isinstance(value, bool):
+        return None
+    try:
+        size = float(value) * microns_per_unit
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return size if 0 < size < float("inf") else None
+
+
+def _get_sem_pixel_size(
+    tags: TiffTags, image_width: int
+) -> typing.Optional[typing.Tuple[float, float]]:
+    """Return lateral pixel sizes (Y, X) in microns from SEM metadata."""
+    for name in ("FEI_SFEG", "FEI_HELIOS"):
+        metadata = tags.valueof(name)
+        scan = metadata.get("Scan") if isinstance(metadata, dict) else None
+        if isinstance(scan, dict):
+            y_size = _positive_size_in_microns(scan.get("PixelHeight"), 1e6)
+            x_size = _positive_size_in_microns(scan.get("PixelWidth"), 1e6)
+            if y_size is not None and x_size is not None:
+                return y_size, x_size
+
+    zeiss = tags.valueof("CZ_SEM")
+    if not isinstance(zeiss, dict):
+        return None
+
+    # The unnamed SmartSEM scale is in meters for a 1024-pixel-wide image.
+    reference_values = zeiss.get("", ())
+    if len(reference_values) > 3 and image_width > 0:
+        size = _positive_size_in_microns(reference_values[3], 1e6 * 1024 / image_width)
+        if size is not None:
+            return size, size
+
+    # The named image pixel size already describes the stored resolution.
+    image_pixel_size = zeiss.get("ap_image_pixel_size", ())
+    if len(image_pixel_size) != 3:
+        return None
+    _, value, unit = image_pixel_size
+    microns_per_unit = 1e6 if unit == "m" else _NAME_TO_MICRONS.get(unit)
+    if microns_per_unit is None:
+        return None
+    size = _positive_size_in_microns(value, microns_per_unit)
+    return None if size is None else (size, size)
+
+
 def _get_pixel_size(
     path_or_file: typing.Any, series_index: int
 ) -> typing.Tuple[
@@ -596,21 +644,30 @@ def _get_pixel_size(
     """Return the pixel size in microns (z,y,x) for the given series in a tiff path."""
 
     with TiffFile(path_or_file, is_mmstack=False) as tiff:
-        tags = tiff.series[series_index].pages[0].tags
+        frame = tiff.series[series_index].pages[0]
+        if frame is None:
+            raise ValueError("TIFF series is missing its first page")
+        page = frame.aspage()
+        tags = page.tags
 
-    if tiff.is_imagej:
-        unit = tiff.imagej_metadata["unit"]
-        z_size = tiff.imagej_metadata.get("spacing", None)
-    else:
-        unit = tags["ResolutionUnit"].value
-        z_size = None
+        imagej = tiff.imagej_metadata
+        if imagej is not None:
+            unit = imagej["unit"]
+            z_size = imagej.get("spacing", None)
+        else:
+            sem_size = _get_sem_pixel_size(tags, page.imagewidth)
+            if sem_size is not None:
+                y_size, x_size = sem_size
+                return None, y_size, x_size
+            unit = tags["ResolutionUnit"].value
+            z_size = None
+
+        # Resolution tags store pixels per unit as two LONGs.
+        x_npix, x_res_units = tags["XResolution"].value
+        y_npix, y_res_units = tags["YResolution"].value
 
     scalar = _NAME_TO_MICRONS.get(unit, 1)
 
-    # Resolution tags are two LONGs: representing a fraction
-    # "The number of pixels per ResolutionUnit"
-    x_npix, x_res_units = tags["XResolution"].value
-    y_npix, y_res_units = tags["YResolution"].value
     # the inverse of the fraction is the size of a pixel
     x_size = scalar * x_res_units / x_npix
     y_size = scalar * y_res_units / y_npix

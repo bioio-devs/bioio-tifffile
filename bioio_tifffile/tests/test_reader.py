@@ -422,3 +422,81 @@ def test_size_one_dim_delayed_read(
 
     # The delayed read must produce the same data as the in memory read
     np.testing.assert_array_equal(img.dask_data.compute(), img.data)
+
+
+@pytest.mark.parametrize(
+    "tag, metadata, expected_yx",
+    [
+        pytest.param(
+            34680,
+            "[Scan]\nPixelWidth=3.2e-9\nPixelHeight=6e-9\n",
+            (0.006, 0.0032),
+            id="fei-sfeg",
+        ),
+        pytest.param(
+            34682,
+            "[Scan]\nPixelWidth=3.2e-9\nPixelHeight=6e-9\n",
+            (0.006, 0.0032),
+            id="fei-helios",
+        ),
+        pytest.param(
+            34118,
+            "0\n0\n0\n5.824988e-9\nAP_PIXEL_SIZE\nPixel Size = 5.825 nm\n",
+            (0.011649976, 0.011649976),
+            id="zeiss-scale-at-1024-pixels",
+        ),
+        pytest.param(
+            34118,
+            "AP_IMAGE_PIXEL_SIZE\nImage Pixel Size = 15.5 nm\n",
+            (0.0155, 0.0155),
+            id="zeiss-image-pixel-size",
+        ),
+        pytest.param(
+            34682,
+            "[Scan]\nPixelWidth=nan\nPixelHeight=6e-9\n",
+            (793.75, 396.875),
+            id="invalid-fei-scale-falls-back-to-resolution",
+        ),
+        pytest.param(
+            34118,
+            "AP_IMAGE_PIXEL_SIZE\nImage Pixel Size = 25.0 pixels\n",
+            (793.75, 396.875),
+            id="unknown-zeiss-unit-falls-back-to-resolution",
+        ),
+    ],
+)
+def test_sem_tiff_pixel_sizes(
+    tmp_path: pathlib.Path,
+    tag: int,
+    metadata: str,
+    expected_yx: Tuple[float, float],
+) -> None:
+    path = tmp_path / "sem.tif"
+    tifffile.imwrite(
+        path,
+        np.zeros((8, 512), dtype=np.uint8),
+        resolution=(64, 32),
+        resolutionunit="INCH",
+        extratags=[(tag, "s", 0, metadata, False)],
+    )
+
+    z, y, x = Reader(path).physical_pixel_sizes
+    assert z is None
+    assert (y, x) == pytest.approx(expected_yx)
+
+
+def test_imagej_pixel_sizes_take_precedence_over_sem_tags(
+    tmp_path: pathlib.Path,
+) -> None:
+    path = tmp_path / "imagej.tif"
+    scan = "[Scan]\nPixelWidth=3e-9\nPixelHeight=6e-9\n"
+    tifffile.imwrite(
+        path,
+        np.zeros((2, 8, 512), dtype=np.uint8),
+        imagej=True,
+        metadata={"axes": "ZYX", "unit": "um", "spacing": 2.5},
+        resolution=(8, 4),
+        extratags=[(34682, "s", 0, scan, False)],
+    )
+
+    assert Reader(path).physical_pixel_sizes == pytest.approx((2.5, 0.25, 0.125))
