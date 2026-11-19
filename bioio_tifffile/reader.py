@@ -13,7 +13,6 @@ from bioio_base import constants, dimensions, exceptions, io, reader, types
 from dask import delayed
 from fsspec.spec import AbstractFileSystem
 from tifffile import TiffFile
-from tifffile.tifffile import TiffTags
 
 from .utils import generate_ome_channel_id, generate_ome_image_id
 
@@ -23,10 +22,26 @@ from .utils import generate_ome_channel_id, generate_ome_image_id
 # "I" is used to mean a generic image sequence
 UNKNOWN_DIM_CHARS = ["Q", "I"]
 TIFF_IMAGE_DESCRIPTION_TAG_INDEX = 270
+TIFF_X_RESOLUTION_TAG_INDEX = 282
+TIFF_Y_RESOLUTION_TAG_INDEX = 283
+TIFF_RESOLUTION_UNIT_TAG_INDEX = 296
 
 log = logging.getLogger(__name__)
 
 ###############################################################################
+
+
+class _SceneMetadata(typing.NamedTuple):
+    axes: str
+    shape: typing.Tuple[int, ...]
+    dtype: np.dtype
+    tags: typing.Dict[int, typing.Any]
+
+
+class _TiffMetadata(typing.NamedTuple):
+    scenes: typing.Tuple[str, ...]
+    series: typing.Tuple[_SceneMetadata, ...]
+    imagej: typing.Optional[typing.Dict[str, typing.Any]]
 
 
 class Reader(reader.Reader):
@@ -59,7 +74,7 @@ class Reader(reader.Reader):
         Default: {}
     """
 
-    _scenes: typing.Optional[typing.Tuple[str, ...]] = None
+    _tiff_metadata: typing.Optional[_TiffMetadata] = None
     _physical_pixel_sizes: typing.Optional[types.PhysicalPixelSizes] = None
 
     @staticmethod
@@ -141,28 +156,48 @@ class Reader(reader.Reader):
 
     @property
     def scenes(self) -> typing.Tuple[str, ...]:
-        if self._scenes is None:
+        return self._get_tiff_metadata().scenes
+
+    def _get_tiff_metadata(self) -> _TiffMetadata:
+        if self._tiff_metadata is None:
             with self._fs.open(self._path) as open_resource:
                 with TiffFile(open_resource, is_mmstack=False) as tiff:
-                    # This is non-metadata tiff, just use available series indices
-                    self._scenes = tuple(
-                        generate_ome_image_id(i) for i in range(len(tiff.series))
-                    )
+                    return self._load_tiff_metadata(tiff)
+        return self._tiff_metadata
 
-        return self._scenes
+    def _load_tiff_metadata(self, tiff: TiffFile) -> _TiffMetadata:
+        if self._tiff_metadata is None:
+            # Read tag values while the TIFF is open to keep the reader picklable.
+            series = []
+            for scene in tiff.series:
+                page = scene.pages[0] or scene.keyframe
+                series.append(
+                    _SceneMetadata(
+                        axes=scene.pages.axes,
+                        shape=scene.shape,
+                        dtype=scene.dtype,
+                        tags={code: tag.value for code, tag in page.tags.items()},
+                    )
+                )
+            self._tiff_metadata = _TiffMetadata(
+                scenes=tuple(generate_ome_image_id(i) for i in range(len(series))),
+                series=tuple(series),
+                imagej=(tiff.imagej_metadata or {}) if tiff.is_imagej else None,
+            )
+        return self._tiff_metadata
 
     @property
     def physical_pixel_sizes(self) -> types.PhysicalPixelSizes:
         """Return the physical pixel sizes of the image."""
         if self._physical_pixel_sizes is None:
-            with self._fs.open(self._path) as open_resource:
-                try:
-                    z_size, y_size, x_size = _get_pixel_size(
-                        open_resource, self._current_scene_index
-                    )
-                except Exception as e:
-                    warnings.warn(f"Could not parse tiff pixel size: {e}")
-                    z_size, y_size, x_size = None, None, None
+            metadata = self._get_tiff_metadata()
+            try:
+                z_size, y_size, x_size = _get_pixel_size(
+                    metadata.series[self.current_scene_index].tags, metadata.imagej
+                )
+            except Exception as e:
+                warnings.warn(f"Could not parse tiff pixel size: {e}")
+                z_size, y_size, x_size = None, None, None
 
             self._physical_pixel_sizes = types.PhysicalPixelSizes(
                 z_size, y_size, x_size
@@ -213,18 +248,6 @@ class Reader(reader.Reader):
                     # any worker data transfer and handoff _during_ a read.
                     return arr[retrieve_indices].compute(scheduler="synchronous")
 
-    def _get_tiff_tags(self, tiff: TiffFile, process: bool = True) -> TiffTags:
-        unprocessed_tags = tiff.series[self.current_scene_index].pages[0].tags
-        if not process:
-            return unprocessed_tags
-
-        # Create dict of tag and value
-        tags: typing.Dict[int, str] = {}
-        for code, tag in unprocessed_tags.items():
-            tags[code] = tag.value
-
-        return tags
-
     @staticmethod
     def _merge_dim_guesses(dims_from_meta: str, guessed_dims: str) -> str:
         # Construct a "best guess" (super naive)
@@ -254,9 +277,8 @@ class Reader(reader.Reader):
 
         return "".join(best_guess)
 
-    def _guess_tiff_dim_order(self, tiff: TiffFile) -> typing.List[str]:
-        scene = tiff.series[self.current_scene_index]
-        dims_from_meta = scene.pages.axes
+    def _guess_tiff_dim_order(self, scene: _SceneMetadata) -> typing.List[str]:
+        dims_from_meta = scene.axes
 
         # If all dims are known, simply return as list
         if all(i not in UNKNOWN_DIM_CHARS for i in dims_from_meta):
@@ -268,10 +290,10 @@ class Reader(reader.Reader):
             guessed_dims = Reader._guess_dim_order(scene.shape)
             return [d for d in self._merge_dim_guesses(dims_from_meta, guessed_dims)]
 
-    def _get_dims_for_scene(self, tiff: TiffFile) -> typing.List[str]:
+    def _get_dims_for_scene(self, scene: _SceneMetadata) -> typing.List[str]:
         # Get / guess dims
         if self._dim_order is None:
-            return self._guess_tiff_dim_order(tiff)
+            return self._guess_tiff_dim_order(scene)
 
         # Provided list get or guess based
         if isinstance(self._dim_order, list):
@@ -280,7 +302,7 @@ class Reader(reader.Reader):
                 return list(self._dim_order[self.current_scene_index])
 
             # Otherwise guess
-            return self._guess_tiff_dim_order(tiff)
+            return self._guess_tiff_dim_order(scene)
 
         # Provided the same string for all, use
         return list(self._dim_order)
@@ -349,14 +371,14 @@ class Reader(reader.Reader):
         return coords
 
     def _create_dask_array(
-        self, tiff: TiffFile, selected_scene_dims_list: typing.List[str]
+        self, selected_scene: _SceneMetadata, selected_scene_dims_list: typing.List[str]
     ) -> da.Array:
         """
         Creates a delayed dask array for the file.
         Parameters
         ----------
-        tiff: TiffFile
-            An open TiffFile for processing.
+        selected_scene: _SceneMetadata
+            The shape and dtype of the selected TIFF series.
         selected_scene_dims_list: List[str]
             The dimensions to use for constructing the array with.
             Required for managing chunked vs non-chunked dimensions.
@@ -374,7 +396,6 @@ class Reader(reader.Reader):
         self.chunk_dims = [d.upper() for d in self.chunk_dims]
 
         # Construct delayed dask array
-        selected_scene = tiff.series[self.current_scene_index]
         selected_scene_dims = "".join(selected_scene_dims_list)
 
         # Raise invalid dims error
@@ -458,6 +479,28 @@ class Reader(reader.Reader):
 
         return image_data
 
+    def _make_data_array(
+        self,
+        image_data: typing.Union[da.Array, np.ndarray],
+        dims: typing.List[str],
+        tiff_tags: typing.Dict[int, typing.Any],
+    ) -> xr.DataArray:
+        channels = self._get_channel_names_for_scene(image_data.shape, dims)
+        coords = self._get_coords(
+            dims,
+            image_data.shape,
+            scene_index=self.current_scene_index,
+            channel_names=channels,
+        )
+
+        attrs = {constants.METADATA_UNPROCESSED: tiff_tags.copy()}
+        if TIFF_IMAGE_DESCRIPTION_TAG_INDEX in tiff_tags:
+            attrs[constants.METADATA_PROCESSED] = tiff_tags[
+                TIFF_IMAGE_DESCRIPTION_TAG_INDEX
+            ]
+
+        return xr.DataArray(image_data, dims=dims, coords=coords, attrs=attrs)
+
     def _read_delayed(self) -> xr.DataArray:
         """
         Construct the delayed xarray DataArray object for the image.
@@ -471,45 +514,10 @@ class Reader(reader.Reader):
         exceptions.UnsupportedFileFormatError
             The file could not be read or is not supported.
         """
-        with self._fs.open(self._path) as open_resource:
-            with TiffFile(open_resource, is_mmstack=False) as tiff:
-                # Get dims from provided or guess
-                dims = self._get_dims_for_scene(tiff)
-
-                # Create the delayed dask array
-                image_data = self._create_dask_array(tiff, dims)
-
-                # Get unprocessed metadata from tags
-                tiff_tags = self._get_tiff_tags(tiff)
-
-                # Get channel names for this scene or generate
-                channels = self._get_channel_names_for_scene(image_data.shape, dims)
-
-                # Create coords
-                coords = self._get_coords(
-                    dims,
-                    image_data.shape,
-                    scene_index=self.current_scene_index,
-                    channel_names=channels,
-                )
-
-                # Try accepted processed metadata
-                try:
-                    attrs = {
-                        constants.METADATA_UNPROCESSED: tiff_tags,
-                        constants.METADATA_PROCESSED: tiff_tags[
-                            TIFF_IMAGE_DESCRIPTION_TAG_INDEX
-                        ],
-                    }
-                except KeyError:
-                    attrs = {constants.METADATA_UNPROCESSED: tiff_tags}
-
-                return xr.DataArray(
-                    image_data,
-                    dims=dims,
-                    coords=coords,
-                    attrs=attrs,
-                )
+        scene = self._get_tiff_metadata().series[self.current_scene_index]
+        dims = self._get_dims_for_scene(scene)
+        image_data = self._create_dask_array(scene, dims)
+        return self._make_data_array(image_data, dims, scene.tags)
 
     def _read_immediate(self) -> xr.DataArray:
         """
@@ -526,43 +534,11 @@ class Reader(reader.Reader):
         """
         with self._fs.open(self._path) as open_resource:
             with TiffFile(open_resource, is_mmstack=False) as tiff:
-                # Get dims from provided or guess
-                dims = self._get_dims_for_scene(tiff)
-
-                # Read image into memory
+                scene = self._load_tiff_metadata(tiff).series[self.current_scene_index]
+                dims = self._get_dims_for_scene(scene)
                 image_data = tiff.series[self.current_scene_index].asarray()
 
-                # Get unprocessed metadata from tags
-                tiff_tags = self._get_tiff_tags(tiff)
-
-                # Get channel names for this scene or generate
-                channels = self._get_channel_names_for_scene(image_data.shape, dims)
-
-                # Create dims and coords
-                coords = self._get_coords(
-                    dims,
-                    image_data.shape,
-                    scene_index=self.current_scene_index,
-                    channel_names=channels,
-                )
-
-                # Try accepted processed metadata
-                try:
-                    attrs = {
-                        constants.METADATA_UNPROCESSED: tiff_tags,
-                        constants.METADATA_PROCESSED: tiff_tags[
-                            TIFF_IMAGE_DESCRIPTION_TAG_INDEX
-                        ],
-                    }
-                except KeyError:
-                    attrs = {constants.METADATA_UNPROCESSED: tiff_tags}
-
-                return xr.DataArray(
-                    image_data,
-                    dims=dims,
-                    coords=coords,
-                    attrs=attrs,
-                )
+        return self._make_data_array(image_data, dims, scene.tags)
 
 
 _NAME_TO_MICRONS = {
@@ -589,28 +565,26 @@ _NAME_TO_MICRONS = {
 
 
 def _get_pixel_size(
-    path_or_file: typing.Any, series_index: int
+    tags: typing.Dict[int, typing.Any],
+    imagej: typing.Optional[typing.Dict[str, typing.Any]],
 ) -> typing.Tuple[
     typing.Optional[float], typing.Optional[float], typing.Optional[float]
 ]:
-    """Return the pixel size in microns (z,y,x) for the given series in a tiff path."""
+    """Return the pixel size in microns (z, y, x) from TIFF metadata."""
 
-    with TiffFile(path_or_file, is_mmstack=False) as tiff:
-        tags = tiff.series[series_index].pages[0].tags
-
-    if tiff.is_imagej:
-        unit = tiff.imagej_metadata["unit"]
-        z_size = tiff.imagej_metadata.get("spacing", None)
+    if imagej is not None:
+        unit = imagej["unit"]
+        z_size = imagej.get("spacing", None)
     else:
-        unit = tags["ResolutionUnit"].value
+        unit = tags[TIFF_RESOLUTION_UNIT_TAG_INDEX]
         z_size = None
 
     scalar = _NAME_TO_MICRONS.get(unit, 1)
 
     # Resolution tags are two LONGs: representing a fraction
     # "The number of pixels per ResolutionUnit"
-    x_npix, x_res_units = tags["XResolution"].value
-    y_npix, y_res_units = tags["YResolution"].value
+    x_npix, x_res_units = tags[TIFF_X_RESOLUTION_TAG_INDEX]
+    y_npix, y_res_units = tags[TIFF_Y_RESOLUTION_TAG_INDEX]
     # the inverse of the fraction is the size of a pixel
     x_size = scalar * x_res_units / x_npix
     y_size = scalar * y_res_units / y_npix

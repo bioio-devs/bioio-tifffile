@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import pathlib
+import pickle
 import time
 from typing import Dict, List, Optional, Tuple, Union
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -175,6 +177,40 @@ def test_tiff_reader(
 def test_tiff_reader_with_non_tiff_file(sample_text_file: pathlib.Path) -> None:
     with pytest.raises(exceptions.UnsupportedFileFormatError):
         Reader(sample_text_file)
+
+
+@pytest.mark.parametrize(
+    "first_access", ["scenes", "dims", "physical_pixel_sizes", "data"]
+)
+def test_metadata_reuses_tiff_scan(tmp_path: pathlib.Path, first_access: str) -> None:
+    path = tmp_path / "scenes.tif"
+    first = np.arange(12, dtype=np.uint8).reshape(3, 4)
+    second = np.arange(35, dtype=np.uint16).reshape(5, 7)
+    with tifffile.TiffWriter(path) as writer:
+        writer.write(first, metadata=None, resolution=(4, 2), resolutionunit="NONE")
+        writer.write(second, metadata=None, resolution=(2, 4), resolutionunit="NONE")
+
+    img = Reader(path)
+    with patch.object(img._fs, "open", wraps=img._fs.open) as open_file:
+        getattr(img, first_access)
+        assert img.scenes == ("Image:0", "Image:1")
+        assert img.dims.order == "YX"
+        assert img.dims.shape == first.shape
+        assert img.dtype == first.dtype
+        assert img.metadata[256] == first.shape[1]
+        assert img.physical_pixel_sizes == (None, 0.5, 0.25)
+
+        img.set_scene("Image:1")
+        assert img.dims.shape == second.shape
+        assert img.dtype == second.dtype
+        assert img.metadata[256] == second.shape[1]
+        assert img.physical_pixel_sizes == (None, 0.25, 0.5)
+
+        assert open_file.call_count == 1
+
+    restored = pickle.loads(pickle.dumps(img))
+    np.testing.assert_array_equal(restored.dask_data.compute(), second)
+    np.testing.assert_array_equal(restored.data, second)
 
 
 @pytest.mark.parametrize(
